@@ -97,3 +97,12 @@ numerical = [var for var in numerical if var not in['Survived', 'PassengerId']]
 
 
 
+
+
+
+
+
+
+
+
+
