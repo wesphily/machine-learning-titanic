@@ -1,4 +1,4 @@
-# to handle datasets
+##Import Required Libraries##
 import pandas as pd
 import numpy as np
 # for text / string processing
@@ -24,23 +24,11 @@ pd.pandas.set_option('display.max_columns', None)
 import warnings
 warnings.filterwarnings('ignore')
 
-##load dataset
+##load dataset##
 data = pd.read_csv('train.csv')
 submission = pd.read_csv('test.csv')
 
-##Graph Age and Fare to see distribution. Age is Gausian while Fare is not. 
-##We'll use Gaussian for Age and interquartile range for Fare in processing
-#plt.figure(figsize=(15,6))
-#plt.subplot(1, 2, 1) 
-#fig = data.Age.hist(bins=20)
-#fig.set_ylabel('Number of passengers')
-#fig.set_xlabel('Age')
- 
-#plt.subplot(1, 2, 2)
-#fig = data.Fare.hist(bins=20)
-#fig.set_ylabel('Number of passengers')
-#fig.set_xlabel('Fare')
-
+##Investigate Data##
 ##Age Gaussian
 Upper_boundary = data.Age.mean() + 3* data.Age.std()
 Lower_boundary = data.Age.mean() - 3* data.Age.std()
@@ -56,6 +44,17 @@ Upper_fence = data.Fare.quantile(0.75) + (IQR * 3)
 for var in ['Pclass',  'SibSp', 'Parch']:
     ##counts the number of times each value occurrs and then divides it by the length of data which is 891
     print(data[var].value_counts() / np.float(len(data)))
+##Columns that are categorical
+categorical = [var for var in data.columns if data[var].dtype=='O']
+##Columns that are numerical
+numerical = [var for var in data.columns if data[var].dtype!='O']
+##Strip out Survived and PassengerID since we will not be using them as training variables
+numerical = [var for var in numerical if var not in['Survived', 'PassengerId']]
+##Find number of unique categorical labels    
+for var in categorical:
+    print(var, ' contains ', len(data[var].unique()), ' labels')
+    
+
  
 
 
