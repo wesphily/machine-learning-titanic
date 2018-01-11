@@ -1,0 +1,9 @@
+directory <- setwd("D:/R/Company Test/specdata")
+directory
+data.list.dataframes <- lapply(dir(),read.csv)
+data.combine.dataframes <- do.call(rbind, data.list.dataframes)
+data.clean <- na.omit(data.combine.dataframes)
+data.clean
+#directory
+#mydata
+#mydata[4]
