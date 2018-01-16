@@ -5,7 +5,7 @@ Created on Sun Dec  3 13:24:15 2017
 @author: ptillotson
 """
 
-## converts training.csv to a dictionary of dictionarys. 
+##Impport required libraries 
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, ExtraTreesClassifier, VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -26,6 +26,7 @@ import numpy as np
 import seaborn as sns
 import re
 
+##Read the train and test csv into a pandas dataframe
 train_data = pd.read_csv("train.csv")
 test_data = pd.read_csv("test.csv")
 #train_data["Survived"] = train_data["Survived"].astype("int")
@@ -38,13 +39,13 @@ IDtest = test_data["PassengerId"]
 
     
 
-
+##Convert categorical items to integers
 train_data['Sex'].replace(['male','female'],[0,1],inplace=True)
 train_data["Sex"] = train_data["Sex"].astype("int")
 train_data["Embarked"].replace(["S", "C", "Q"],[1,2,3],inplace=True)
 train_data.loc[(train_data.Embarked.isnull()), "Embarked"]=1
 train_data["Embarked"] = train_data["Embarked"].astype("int")
-
+##Convert categorical items to integers
 test_data['Sex'].replace(['male','female'],[0,1],inplace=True)
 test_data["Sex"] = test_data["Sex"].astype("int")
 test_data["Embarked"].replace(["S", "C", "Q"],[1,2,3],inplace=True)
@@ -52,7 +53,7 @@ test_data.loc[(test_data.Embarked.isnull()), "Embarked"]=1
 test_data["Embarked"] = test_data["Embarked"].astype("int")
     
 
-
+##Fill in missing ages
 train_data.loc[(train_data.Age.isnull()) & (train_data["SibSp"] > 1), 'Age']=9
 train_data.loc[(train_data.Age.isnull()) & (train_data["SibSp"] == 1) & (train_data["Parch"] > 0), 'Age']=9
 train_data.loc[(train_data.Age.isnull()) & (train_data["SibSp"] <= 1) & (train_data["Parch"] == 2), 'Age']=9
@@ -61,7 +62,7 @@ train_data.loc[(train_data.Age.isnull()) & (train_data["SibSp"] <= 1) & (train_d
 #train_data["Age"] = train_data["Age"].astype("int")
 ####Top code age to 73 since that is the upper level of the Gaussian distribution
 train_data.loc[(train_data["Age"]>=74), 'Age']=73
-
+##Fill in missing ages
 test_data.loc[(test_data.Age.isnull()) & (test_data["SibSp"] > 1), 'Age']=9
 test_data.loc[(test_data.Age.isnull()) & (test_data["SibSp"] == 1) & (test_data["Parch"] > 0), 'Age']=9
 test_data.loc[(test_data.Age.isnull()) & (test_data["SibSp"] <= 1) & (test_data["Parch"] == 2), 'Age']=9
@@ -72,9 +73,9 @@ test_data.loc[(test_data.Age.isnull()), 'Age']=30
 ####Top code age to 73 since that is the upper level of the Gaussian distribution
 test_data.loc[(test_data["Age"]>=74), 'Age']=73
 
-#Put Fare into quartile buckets since the distribution of values is skewed. 
+##Put Fare into quartile buckets since the distribution of values is skewed. 
 train_data['Fare']=pd.qcut(train_data.Fare, q=8, labels=False)
-
+##Put Fare into quartile buckets since the distribution of values is skewed.
 test_data['Fare']=pd.qcut(test_data.Fare, q=8, labels=False)
 test_data.loc[(test_data.Fare.isnull()), 'Fare']=0
 
@@ -110,15 +111,15 @@ test_data.loc[(test_data["Title"]=="Mr"), 'Title']=1
 test_data.loc[(test_data["Title"]=="Miss"), 'Title']=2
 test_data.loc[(test_data["Title"]=="Master"), 'Title']=3
 test_data.loc[(test_data["Title"]=="Other"), 'Title']=4
-
+##Create feature showing family size
 train_data['Family_Size']=0
 train_data['Family_Size']=train_data['Parch']+train_data['SibSp']
 train_data.loc[(train_data['Family_Size']>7), 'Family_Size']=7
-
+##Create feature showing family size
 test_data['Family_Size']=0
 test_data['Family_Size']=test_data['Parch']+test_data['SibSp']
 test_data.loc[(test_data['Family_Size']>7), 'Family_Size']=7
-
+##Drop features that will not be used. Split training data for testing accuracy.
 test_data.drop(['Name', 'Ticket', 'Cabin', 'PassengerId', 'SibSp', 'Parch', 'Embarked', 'Pclass'],axis=1,inplace=True)
 train_data.drop(['Name', 'Ticket', 'Cabin', 'PassengerId', 'SibSp', 'Parch', 'Embarked', 'Pclass'],axis=1,inplace=True)
 print(train_data.head(1))
@@ -129,7 +130,7 @@ features_test=test[test.columns[1:]]
 labels_test=test[test.columns[:1]]
 features=train_data[train_data.columns[1:]]
 labels=train_data['Survived']
-
+##Extra Tree Classifier
 etc = ExtraTreesClassifier(bootstrap = False, criterion = 'gini', max_depth = None, min_samples_leaf = 3, min_samples_split = 3, n_estimators = 100)
 #t0 = time()
 etc.fit(features_train, labels_train)
@@ -169,13 +170,12 @@ gbcpred = gbc.predict(features_test)
 #print "training time:", round(time()-t0, 3), "s"
 
 
-
+##Voting Classifier that uses Extra Tree, Random Forrest, and Gradient Boosting
 votingC = VotingClassifier(estimators=[('etc', etc),('rfc', rf),('gbc', gbc)], voting='soft', weights=[1,1,1])
-
 votingC = votingC.fit(features_train,labels_train.values.ravel())
 pred = votingC.predict(features_test)
 
-
+##Display recall, precision, and accuracy. Try to get recall and precision close.
 accuracy = votingC.score(features_test, labels_test)
 pred_recall = recall_score(labels_test, pred)
 pred_precision = precision_score(labels_test, pred)
@@ -184,7 +184,7 @@ print("Precision", pred_precision)
 #print pred
 print("Accuracy", accuracy)
 
-
+##Create csv to submit to Kaggle
 #test_Survived = pd.Series(votingC.predict(test_data), name="Survived")
 #results = pd.concat([IDtest,test_Survived],axis=1)
 #results.to_csv("submit_to_kaggle.csv",index=False)
