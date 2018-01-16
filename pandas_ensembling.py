@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Nov  5 18:59:36 2017
-@author: ptillotson
-"""
-
 ## converts training.csv to a dictionary of dictionarys. 
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier, GradientBoostingClassifier, ExtraTreesClassifier, VotingClassifier
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
@@ -42,17 +36,6 @@ train_data["Embarked"] = train_data["Embarked"].astype("int")
     
     
         
-#fill in NaN age values
-   # for key, value in train_list.iteritems():
-    #    if value["Age"] == "":
-     #       if value["SibSp"] > 1:
-      #          value["Age"] = 9
-       #     else:
-        #        if value["SibSp"] == 1:
-         #           if value["Parch"] > 0:
-          #              value["Age"] == 9
-           #         else:
-            #            value["Age"] == 30
 
 train_data.loc[(train_data.Age.isnull()) & (train_data["SibSp"] > 1), 'Age']=9
 train_data.loc[(train_data.Age.isnull()) & (train_data["SibSp"] == 1) & (train_data["Parch"] > 0), 'Age']=9
