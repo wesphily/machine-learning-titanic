@@ -1,0 +1,493 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon May 14 17:05:35 2018
+
+@author: ptillotson
+"""
+
+from sklearn.model_selection import GridSearchCV, cross_val_score, StratifiedKFold, learning_curve
+from sklearn.datasets import make_classification
+from time import time
+from sklearn.metrics import roc_auc_score
+from sklearn import metrics
+from sklearn.model_selection import train_test_split
+from sklearn import cross_validation
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+from sklearn.preprocessing import minmax_scale
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import RandomizedPCA
+import pandas as pd
+import numpy as np
+import re
+import scipy.stats as stats
+import keras
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import Dropout
+from keras.layers.advanced_activations import LeakyReLU, PReLU
+from keras.wrappers.scikit_learn import KerasClassifier
+from sklearn.model_selection import GridSearchCV
+
+
+
+train_data = pd.read_csv("train.csv")
+test_data = pd.read_csv("test.csv")
+#train_data["Survived"] = train_data["Survived"].astype("int")
+#train_data["SibSp"] = train_data["SibSp"].astype("int")
+#train_data["Parch"] = train_data["Parch"].astype("int")
+train_data["Embarked"] = train_data["Embarked"].astype("category")
+test_data["Embarked"] = train_data["Embarked"].astype("category")
+IDtest = test_data["PassengerId"]
+#print(train_data.head())
+
+
+
+
+train_data['Sex'].replace(['male','female'],[0,1],inplace=True)
+train_data["Sex"] = train_data["Sex"].astype("int")
+train_data["Embarked"].replace(["S", "C", "Q"],[0,1,2],inplace=True)
+train_data.loc[(train_data.Embarked.isnull()), "Embarked"]=1
+train_data["Embarked"] = train_data["Embarked"].astype("int")
+
+
+test_data['Sex'].replace(['male','female'],[0,1],inplace=True)
+test_data["Sex"] = test_data["Sex"].astype("int")
+test_data["Embarked"].replace(["S", "C", "Q"],[0,1,2],inplace=True)
+test_data.loc[(test_data.Embarked.isnull()), "Embarked"]=0
+test_data["Embarked"] = test_data["Embarked"].astype("int")
+    
+
+
+train_data['family_size']=train_data['SibSp'] + train_data['Parch']
+train_data['family_size']=train_data['family_size'].astype('int')
+test_data['family_size']=test_data['SibSp'] + test_data['Parch']
+test_data['family_size']=test_data['family_size'].astype('int')
+
+
+
+train_data['Age_Missing'] = 0
+train_data.loc[(train_data.Age.isnull()), 'Age_Missing']=1
+test_data['Age_Missing'] = 0
+test_data.loc[(train_data.Age.isnull()), 'Age_Missing']=1
+
+
+
+#Put Fare into quartile buckets since the distribution of values is skewed. 
+
+
+train_data['Fare_Box'], param = stats.boxcox(train_data.Fare+1)
+train_data['Fare_Bin'], farebins=pd.qcut(train_data.Fare_Box, q=16, labels=False, retbins=True)
+
+test_data.loc[(test_data['Fare'].isnull()), 'Fare']=13
+test_data['Fare_Box'], param = stats.boxcox(test_data.Fare+1)
+test_data['Fare_Bin']=pd.cut(test_data.Fare_Box, bins=farebins, labels=False)
+
+train_data['Fare_Bin0']=0
+train_data.loc[(train_data['Fare_Bin']==0), 'Fare_Bin0']=1
+train_data['Fare_Bin1']=0
+train_data.loc[(train_data['Fare_Bin']==1), 'Fare_Bin1']=1
+train_data['Fare_Bin2']=0
+train_data.loc[(train_data['Fare_Bin']==2), 'Fare_Bin2']=1
+train_data['Fare_Bin3']=0
+train_data.loc[(train_data['Fare_Bin']==3), 'Fare_Bin3']=1
+train_data['Fare_Bin4']=0
+train_data.loc[(train_data['Fare_Bin']==4), 'Fare_Bin4']=1
+train_data['Fare_Bin5']=0
+train_data.loc[(train_data['Fare_Bin']==5), 'Fare_Bin5']=1
+train_data['Fare_Bin6']=0
+train_data.loc[(train_data['Fare_Bin']==6), 'Fare_Bin6']=1
+train_data['Fare_Bin7']=0
+train_data.loc[(train_data['Fare_Bin']==7), 'Fare_Bin7']=1
+train_data['Fare_Bin8']=0
+train_data.loc[(train_data['Fare_Bin']==8), 'Fare_Bin8']=1
+train_data['Fare_Bin9']=0
+train_data.loc[(train_data['Fare_Bin']==9), 'Fare_Bin9']=1
+train_data['Fare_Bin10']=0
+train_data.loc[(train_data['Fare_Bin']==10), 'Fare_Bin10']=1
+train_data['Fare_Bin11']=0
+train_data.loc[(train_data['Fare_Bin']==11), 'Fare_Bin11']=1
+train_data['Fare_Bin12']=0
+train_data.loc[(train_data['Fare_Bin']==12), 'Fare_Bin12']=1
+train_data['Fare_Bin13']=0
+train_data.loc[(train_data['Fare_Bin']==13), 'Fare_Bin13']=1
+train_data['Fare_Bin14']=0
+train_data.loc[(train_data['Fare_Bin']==14), 'Fare_Bin14']=1
+train_data['Fare_Bin15']=0
+train_data.loc[(train_data['Fare_Bin']==15), 'Fare_Bin15']=1
+
+test_data['Fare_Bin0']=0
+test_data.loc[(test_data['Fare_Bin']==0), 'Fare_Bin0']=1
+test_data['Fare_Bin1']=0
+test_data.loc[(test_data['Fare_Bin']==1), 'Fare_Bin1']=1
+test_data['Fare_Bin2']=0
+test_data.loc[(test_data['Fare_Bin']==2), 'Fare_Bin2']=1
+test_data['Fare_Bin3']=0
+test_data.loc[(test_data['Fare_Bin']==3), 'Fare_Bin3']=1
+test_data['Fare_Bin4']=0
+test_data.loc[(test_data['Fare_Bin']==4), 'Fare_Bin4']=1
+test_data['Fare_Bin5']=0
+test_data.loc[(test_data['Fare_Bin']==5), 'Fare_Bin5']=1
+test_data['Fare_Bin6']=0
+test_data.loc[(test_data['Fare_Bin']==6), 'Fare_Bin6']=1
+test_data['Fare_Bin7']=0
+test_data.loc[(test_data['Fare_Bin']==7), 'Fare_Bin7']=1
+test_data['Fare_Bin8']=0
+test_data.loc[(test_data['Fare_Bin']==8), 'Fare_Bin8']=1
+test_data['Fare_Bin9']=0
+test_data.loc[(test_data['Fare_Bin']==9), 'Fare_Bin9']=1
+test_data['Fare_Bin10']=0
+test_data.loc[(test_data['Fare_Bin']==10), 'Fare_Bin10']=1
+test_data['Fare_Bin11']=0
+test_data.loc[(test_data['Fare_Bin']==11), 'Fare_Bin11']=1
+test_data['Fare_Bin12']=0
+test_data.loc[(test_data['Fare_Bin']==12), 'Fare_Bin12']=1
+test_data['Fare_Bin13']=0
+test_data.loc[(test_data['Fare_Bin']==13), 'Fare_Bin13']=1
+test_data['Fare_Bin14']=0
+test_data.loc[(test_data['Fare_Bin']==14), 'Fare_Bin14']=1
+test_data['Fare_Bin15']=0
+test_data.loc[(test_data['Fare_Bin']==15), 'Fare_Bin15']=1
+
+
+#train_data.loc[(train_data["Age"]>=74), 'Age']=73
+#train_data['Age'] = train_data.Age**(1/1.2)
+#test_data.loc[(test_data["Age"]>=74), 'Age']=73
+#test_data['Age'] = train_data.Age**(1/1.2)
+
+##Rare title work such as Mr. and Mrs.
+##Names have unique titles such as Mrs or Mr. Let's extract that and place it into a new column.
+def get_title(passenger):
+    line = passenger
+    if re.search('Mrs', line):
+        return 'Mrs'
+    elif re.search('Mr', line):
+        return 'Mr'
+    elif re.search('Miss', line):
+        return 'Miss'
+    elif re.search('Master', line):
+        return 'Master'
+    else:
+        return 'Other'
+##Add title column to train_data with title (i.e. Mr or Mrs)  
+train_data['Title'] = train_data['Name'].apply(get_title)
+##Convert Title to a number representing the Title
+train_data['Title0'] = 0
+train_data.loc[(train_data["Title"]=="Mrs"), 'Title0']=1
+train_data['Title1'] = 0
+train_data.loc[(train_data["Title"]=="Mr"), 'Title1']=1
+train_data['Title2'] = 0
+train_data.loc[(train_data["Title"]=="Miss"), 'Title2']=1
+train_data['Title3'] = 0
+train_data.loc[(train_data["Title"]=="Master"), 'Title3']=1
+train_data['Title4'] = 0
+train_data.loc[(train_data["Title"]=="Other"), 'Title4']=1
+#train_data['Title'] = train_data['Title'].astype('int')
+train_data.drop(['Title'],axis=1,inplace=True)
+
+##Add title column to train_data with title (i.e. Mr or Mrs)  
+test_data['Title'] = test_data['Name'].apply(get_title)
+##Convert Title to a number representing the Title
+test_data['Title0']=0
+test_data.loc[(test_data["Title"]=="Mrs"), 'Title0']=1
+test_data['Title1']=0
+test_data.loc[(test_data["Title"]=="Mr"), 'Title1']=1
+test_data['Title2']=0
+test_data.loc[(test_data["Title"]=="Miss"), 'Title2']=1
+test_data['Title3']=0
+test_data.loc[(test_data["Title"]=="Master"), 'Title3']=1
+test_data['Title4']=0
+test_data.loc[(test_data["Title"]=="Other"), 'Title4']=1
+#test_data['Title'] = train_data['Title'].astype('int')
+test_data.drop(['Title'],axis=1,inplace=True)
+
+train_data['Pclass1'] = 0
+train_data.loc[(train_data['Pclass']==1), 'Pclass1']=1
+train_data['Pclass2'] = 0
+train_data.loc[(train_data['Pclass']==2), 'Pclass2']=1
+
+
+test_data['Pclass1'] = 0
+test_data.loc[(test_data['Pclass']==1), 'Pclass1']=1
+test_data['Pclass2'] = 0
+test_data.loc[(test_data['Pclass']==2), 'Pclass2']=1
+
+
+
+
+
+
+######################   ANN to Predict Age Bin for Missing Ages In Train Data ####################
+
+train_Age_Present = train_data.loc[(train_data['Age_Missing']==0)]
+train_Age_Missing = train_data.loc[(train_data['Age_Missing']==1)]
+
+train_Age_Present['Age_Bin'], agebin=pd.qcut(train_Age_Present.Age, q=8, labels=False, retbins=True)
+train_Age_Present['Age_Bin0']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==0), 'Age_Bin0']=1
+train_Age_Present['Age_Bin1']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==1), 'Age_Bin1']=1
+train_Age_Present['Age_Bin2']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==2), 'Age_Bin2']=1
+train_Age_Present['Age_Bin3']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==3), 'Age_Bin3']=1
+train_Age_Present['Age_Bin4']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==4), 'Age_Bin4']=1
+train_Age_Present['Age_Bin5']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==5), 'Age_Bin5']=1
+train_Age_Present['Age_Bin6']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==6), 'Age_Bin6']=1
+train_Age_Present['Age_Bin7']=0
+train_Age_Present.loc[(train_Age_Present['Age_Bin']==7), 'Age_Bin7']=1
+
+
+
+
+train_Age_Present.drop(['Name', 'Ticket', 'Cabin', 'Age_Missing', 'Age', 'Embarked', 'Fare', 'Parch', 'SibSp', 'Pclass', 'Fare_Bin','Fare_Box','PassengerId', 'Age_Bin','Survived', 'Fare_Bin0', 'Title0'],axis=1,inplace=True)
+train_Age_Missing.drop(['Name', 'Ticket', 'Cabin', 'Age_Missing', 'Age', 'Embarked', 'Fare', 'Parch', 'SibSp', 'Pclass', 'Fare_Bin','Fare_Box','PassengerId','Survived', 'Fare_Bin0', 'Title0'],axis=1,inplace=True)
+scaler = MinMaxScaler()
+train_Age_Present[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']] = scaler.fit_transform(train_Age_Present[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']])
+train_Age_Missing[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']] = scaler.transform(train_Age_Missing[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']])
+
+
+train,test=cross_validation.train_test_split(train_Age_Present,test_size=0.20,random_state=42)
+print(train.head())
+
+
+
+features_train=train[train.columns[0:23]]
+labels_train=train[train.columns[23:31]]
+features_test=test[test.columns[0:23]]
+labels_test=test[test.columns[23:31]]
+features=train_data[train_data.columns[0:23]]
+labels=train_data[23:31]
+
+
+annc = Sequential()
+##Hidden layer
+annc.add(Dense(output_dim = 12, init = 'uniform', activation = LeakyReLU(), input_dim = 23))
+#annc.add(LeakyReLU(alpha=0.01))
+#annc.add(Dropout(p = 0.1))
+##Second hidden layer
+annc.add(Dense(output_dim = 12, init = 'uniform', activation = LeakyReLU()))
+#annc.add(LeakyReLU(alpha=0.01))
+#annc.add(Dropout(p = 0.1))
+##Output layer
+annc.add(Dense(output_dim = 8, init = 'uniform', activation = 'sigmoid'))
+##Compiling
+annc.compile(optimizer = 'rmsprop', loss = 'binary_crossentropy', metrics = ['accuracy'])
+##Fit
+annc.fit(features_train, labels_train, batch_size = 10, epochs = 40)
+anncpred = annc.predict(features_test)
+accuracy = annc.evaluate(features_test, labels_test, verbose=0)
+print(accuracy)
+
+
+
+
+Age_Bins_Prediction = annc.predict_classes(train_Age_Missing)
+Age_Bins_Prediction = pd.DataFrame(data=Age_Bins_Prediction, columns = ['Age_Bin'])
+train_Age_Missing['Age_Bin'] = Age_Bins_Prediction
+#test_data = test_data.add(Age_Bins_Prediction)
+#print(test_data['Age_Bins'])
+
+
+
+train_Age_Missing['Age_Bin0']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==0), 'Age_Bin0']=1
+train_Age_Missing['Age_Bin1']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==1), 'Age_Bin1']=1
+train_Age_Missing['Age_Bin2']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==2), 'Age_Bin2']=1
+train_Age_Missing['Age_Bin3']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==3), 'Age_Bin3']=1
+train_Age_Missing['Age_Bin4']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==4), 'Age_Bin4']=1
+train_Age_Missing['Age_Bin5']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==5), 'Age_Bin5']=1
+train_Age_Missing['Age_Bin6']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==6), 'Age_Bin6']=1
+train_Age_Missing['Age_Bin7']=0
+train_Age_Missing.loc[(train_Age_Missing['Age_Bin']==7), 'Age_Bin7']=1
+train_Age_Missing.drop(['Age_Bin'],axis=1,inplace=True)
+
+train_Age_combine = pd.concat([train_Age_Present, train_Age_Missing], axis=0)
+train_Age_sort = train_Age_combine.sort_index(axis=0)
+train_surival = train_data['Survived']
+train_survival_combined = train_Age_sort.join(train_surival)
+train_data = train_survival_combined[['Survived', 'Sex', 'family_size', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'Fare_Bin15', 'Title1', 'Title2', 'Title3', 'Title4', 'Pclass1', 'Pclass2', 'Age_Bin0', 'Age_Bin1', 'Age_Bin2', 'Age_Bin3', 'Age_Bin4', 'Age_Bin5', 'Age_Bin6', 'Age_Bin7']]
+
+
+
+
+######################   ANN to Predict Age Bin for Missing Ages In Test Data ####################
+
+
+
+test_Age_Present = test_data.loc[(test_data['Age_Missing']==0)]
+test_Age_Missing = test_data.loc[(test_data['Age_Missing']==1)]
+
+test_Age_Present['Age_Bin'], agebin=pd.qcut(test_Age_Present.Age, q=8, labels=False, retbins=True)
+test_Age_Present['Age_Bin0']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==0), 'Age_Bin0']=1
+test_Age_Present['Age_Bin1']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==1), 'Age_Bin1']=1
+test_Age_Present['Age_Bin2']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==2), 'Age_Bin2']=1
+test_Age_Present['Age_Bin3']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==3), 'Age_Bin3']=1
+test_Age_Present['Age_Bin4']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==4), 'Age_Bin4']=1
+test_Age_Present['Age_Bin5']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==5), 'Age_Bin5']=1
+test_Age_Present['Age_Bin6']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==6), 'Age_Bin6']=1
+test_Age_Present['Age_Bin7']=0
+test_Age_Present.loc[(test_Age_Present['Age_Bin']==7), 'Age_Bin7']=1
+
+
+
+
+test_Age_Present.drop(['Name', 'Ticket', 'Cabin', 'Age_Missing', 'Age', 'Embarked', 'Fare', 'Parch', 'SibSp', 'Pclass', 'Fare_Bin','Fare_Box','PassengerId', 'Age_Bin', 'Title0', 'Fare_Bin0'],axis=1,inplace=True)
+test_Age_Missing.drop(['Name', 'Ticket', 'Cabin', 'Age_Missing', 'Age', 'Embarked', 'Fare', 'Parch', 'SibSp', 'Pclass', 'Fare_Bin','Fare_Box','PassengerId', 'Title0', 'Fare_Bin0'],axis=1,inplace=True)
+scaler = MinMaxScaler()
+test_Age_Present[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']] = scaler.fit_transform(test_Age_Present[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']])
+test_Age_Missing[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']] = scaler.transform(test_Age_Missing[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']])
+
+
+train,test=cross_validation.train_test_split(test_Age_Present,test_size=0.20,random_state=42)
+print(train.head())
+
+
+
+features_train=train[train.columns[0:23]]
+labels_train=train[train.columns[23:31]]
+features_test=test[test.columns[0:23]]
+labels_test=test[test.columns[23:31]]
+features=train_data[train_data.columns[0:23]]
+labels=train_data[23:31]
+
+
+annc = Sequential()
+##Hidden layer
+annc.add(Dense(output_dim = 12, init = 'uniform', activation = LeakyReLU(), input_dim = 23))
+#annc.add(LeakyReLU(alpha=0.01))
+#annc.add(Dropout(p = 0.1))
+##Second hidden layer
+annc.add(Dense(output_dim = 12, init = 'uniform', activation = LeakyReLU()))
+#annc.add(LeakyReLU(alpha=0.01))
+#annc.add(Dropout(p = 0.1))
+##Output layer
+annc.add(Dense(output_dim = 8, init = 'uniform', activation = 'sigmoid'))
+##Compiling
+annc.compile(optimizer = 'rmsprop', loss = 'binary_crossentropy', metrics = ['accuracy'])
+##Fit
+annc.fit(features_train, labels_train, batch_size = 10, epochs = 40)
+anncpred = annc.predict(features_test)
+accuracy = annc.evaluate(features_test, labels_test, verbose=0)
+print(accuracy)
+
+
+
+
+Age_Bins_Prediction = annc.predict_classes(test_Age_Missing)
+Age_Bins_Prediction = pd.DataFrame(data=Age_Bins_Prediction, columns = ['Age_Bin'])
+test_Age_Missing['Age_Bin'] = Age_Bins_Prediction
+#test_data = test_data.add(Age_Bins_Prediction)
+#print(test_data['Age_Bins'])
+
+
+
+test_Age_Missing['Age_Bin0']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==0), 'Age_Bin0']=1
+test_Age_Missing['Age_Bin1']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==1), 'Age_Bin1']=1
+test_Age_Missing['Age_Bin2']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==2), 'Age_Bin2']=1
+test_Age_Missing['Age_Bin3']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==3), 'Age_Bin3']=1
+test_Age_Missing['Age_Bin4']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==4), 'Age_Bin4']=1
+test_Age_Missing['Age_Bin5']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==5), 'Age_Bin5']=1
+test_Age_Missing['Age_Bin6']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==6), 'Age_Bin6']=1
+test_Age_Missing['Age_Bin7']=0
+test_Age_Missing.loc[(test_Age_Missing['Age_Bin']==7), 'Age_Bin7']=1
+test_Age_Missing.drop(['Age_Bin'],axis=1,inplace=True)
+
+test_Age_combine = pd.concat([test_Age_Present, test_Age_Missing], axis=0)
+test_Age_sort = test_Age_combine.sort_index(axis=0)
+
+test_data = test_Age_sort
+
+
+
+######################  Traind and Predict Final ####################
+
+scaler = MinMaxScaler()
+train_data[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Age_Bin1', 'Age_Bin2', 'Age_Bin3', 'Age_Bin4', 'Age_Bin5', 'Age_Bin6', 'Age_Bin7', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']] = scaler.fit_transform(train_data[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Age_Bin1', 'Age_Bin2', 'Age_Bin3', 'Age_Bin4', 'Age_Bin5', 'Age_Bin6', 'Age_Bin7', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']])
+test_data[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Age_Bin1', 'Age_Bin2', 'Age_Bin3', 'Age_Bin4', 'Age_Bin5', 'Age_Bin6', 'Age_Bin7', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']] = scaler.transform(test_data[['Title1', 'Title2', 'Title3', 'Sex', 'Pclass1', 'Age_Bin1', 'Age_Bin2', 'Age_Bin3', 'Age_Bin4', 'Age_Bin5', 'Age_Bin6', 'Age_Bin7', 'Fare_Bin1', 'Fare_Bin2', 'Fare_Bin3', 'Fare_Bin4', 'Fare_Bin5', 'Fare_Bin6', 'Fare_Bin7', 'Fare_Bin8', 'Fare_Bin9', 'Fare_Bin10', 'Fare_Bin11', 'Fare_Bin12', 'Fare_Bin13', 'Fare_Bin14', 'family_size', 'Pclass2']])
+print(train_data.head(1))
+
+train,test=cross_validation.train_test_split(train_data,test_size=0.20,random_state=42,stratify=train_data['Survived'])
+features_train=train[train.columns[1:]]
+labels_train=train[train.columns[:1]]
+features_test=test[test.columns[1:]]
+labels_test=test[test.columns[:1]]
+features=train_data[train_data.columns[1:]]
+labels=train_data['Survived']
+
+
+
+
+
+annc = Sequential()
+##Hidden layer
+annc.add(Dense(output_dim = 16, init = 'uniform', activation = LeakyReLU(), input_dim = 31))
+#annc.add(LeakyReLU(alpha=0.01))
+#annc.add(Dropout(p = 0.1))
+##Second hidden layer
+annc.add(Dense(output_dim = 16, init = 'uniform', activation = LeakyReLU()))
+#annc.add(LeakyReLU(alpha=0.01))
+#annc.add(Dropout(p = 0.1))
+##Output layer
+annc.add(Dense(output_dim = 1, init = 'uniform', activation = 'sigmoid'))
+##Compiling
+annc.compile(optimizer = 'rmsprop', loss = 'binary_crossentropy', metrics = ['accuracy'])
+##Fit
+annc.fit(features_train, labels_train, batch_size = 20, epochs = 40)
+anncpred = annc.predict(features_test)
+accuracy = annc.evaluate(features_test, labels_test, verbose=0)
+print(accuracy)
+print('Roc-auc: {}'.format(roc_auc_score(labels_test, anncpred)))
+
+
+
+
+def build_classifier():
+    annc = Sequential()
+    annc.add(Dense(output_dim = 16, init = 'uniform', activation = LeakyReLU(), input_dim = 31))
+    #annc.add(LeakyReLU(alpha=0.01))
+    #classifier.add(Dropout(p = 0.1))
+    annc.add(Dense(output_dim = 16, init = 'uniform', activation = LeakyReLU()))
+    #annc.add(LeakyReLU(alpha=0.01))
+    #classifier.add(Dropout(p = 0.1))
+    annc.add(Dense(output_dim = 1, init = 'uniform', activation = 'sigmoid'))
+    annc.compile(optimizer = 'rmsprop', loss = 'binary_crossentropy', metrics = ['accuracy'])
+    return annc
+annc = KerasClassifier(build_fn = build_classifier, batch_size = 20, epochs = 40)
+accuracies = cross_val_score(estimator = annc, X = features_train, y = labels_train, cv = 10, n_jobs = 1)
+print(accuracies)
+
+
+
+test_survived = annc.predict_classes(test_data)
+test_survived = pd.DataFrame(data=test_survived, columns = ['Survived'])
+#results = pd.concat([IDtest,test_survived],axis=1)
+#results.to_csv("submit_to_kaggle4.csv",index=False)
+#test_survived.loc[(test_survived['Survived']>0.60), 'Survived']=1
+#test_survived.loc[(test_survived['Survived']!=1), 'Survived']=0
+#test_survived = pd.Series(test_survived[0:], name="Survived")
+results = pd.concat([IDtest,test_survived],axis=1)
+results.to_csv("submit_to_kaggle3.csv",index=False)
